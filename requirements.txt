@@ -1,0 +1,17 @@
+# Web framework
+fastapi>=0.119.0
+uvicorn>=0.37.0
+
+# Google Cloud libraries
+google-cloud-pubsub>=2.18.0
+google-api-python-client>=2.100.0
+google-auth>=2.23.0
+google-auth-oauthlib>=1.1.0
+google-auth-httplib2>=0.2.0
+google-cloud-secret-manager>=2.16.0
+
+# Configuration and utilities
+pyyaml>=6.0
+python-dotenv>=1.0.0
+requests>=2.31.0
+beautifulsoup4>=4.14.2
