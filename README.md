@@ -44,7 +44,7 @@ A fully-autonomous Cloud Run API that receives Gmail push notifications, process
    ```bash
    uv run test
    ```
-   This will run your `process_email()` function with a dummy Gmail message payload. You can modify the `DUMMY_EMAIL_PAYLOAD` in `app/process_email.py` to test different scenarios.
+   This will run your `process_email()` function with a dummy Gmail message payload. You can modify the `DUMMY_EMAIL_PAYLOAD` in `app/dummy_data.py` to test different scenarios.
 
 5. **Deploy the application (Steps 6-7):**
    ```bash

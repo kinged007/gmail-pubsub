@@ -12,7 +12,8 @@ import os
 # Add the project root to the Python path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.process_email import process_email, DUMMY_EMAIL_PAYLOAD
+from app.process_email import process_email
+from app.dummy_data import DUMMY_EMAIL_PAYLOAD
 
 from dotenv import load_dotenv
 

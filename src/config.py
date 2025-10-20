@@ -68,6 +68,9 @@ env_var_map = {
     # API Security
     "api.access_token": "API_ACCESS_TOKEN",
 
+    # Database Configuration
+    "database.url": "DATABASE_URL",
+
     # Application Configuration
     # "app.log_level": "LOG_LEVEL",
     # "app.port": "PORT"
@@ -109,7 +112,7 @@ class Config:
     def load_env_file(self) -> None:
         """Load environment variables from .env file if it exists."""
         if self.env_file.exists():
-            dotenv.load_dotenv(self.env_file)
+            dotenv.load_dotenv(self.env_file, override=True)
     
     def save_config(self) -> None:
         """Save current configuration to YAML file."""

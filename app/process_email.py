@@ -6,16 +6,21 @@ Modify this file to implement your specific email processing requirements.
 
 The process_email function is called for each new email received.
 """
-import os
 from typing import Dict, Any
+from datetime import datetime
 from src.utils.logger import setup_logger
 from src.utils.email_utils import get_headers, extract_message_body, extract_attachments
 from src.utils.telegram_utils import send_telegram_message, send_email_notification
 from src.config import config
 
-import requests
+from app.utils import parse_date
+
+from src.database import get_database
+from app.models import SampleTableModel
+
 
 logger = setup_logger(__name__)
+
 
 
 def process_email(message: Dict[str, Any]) -> None:
@@ -51,11 +56,14 @@ def process_email(message: Dict[str, Any]) -> None:
         sender = headers.get('from', 'Unknown Sender')
         recipient = headers.get('to', 'Unknown Recipient')
         date = headers.get('date', 'Unknown Date')
-        logger.info(message)  # Debug log to see message structure
+        # logger.info(message)  # Debug log to see message structure
+        
         # Extract message body
         body_text = extract_message_body(message, html_part=True, strip_html=True)
         if not body_text:
+            # Getting plain text instead...
             body_text = extract_message_body(message, html_part=False)
+            logger.warning("No HTML body found, using plain text for message %s", message_id)
         
         # Log the email details
         logger.info("Processing email:")
@@ -108,7 +116,36 @@ def process_email(message: Dict[str, Any]) -> None:
         
         # 5. Store in database
         # # Save to your database
-        # pass
+        try:
+            
+            db = get_database()
+            
+            # Check if database is connected
+            if not db.is_connected:
+                if not db.connect():
+                    logger.warning("Database is not connected, cannot save email log")
+                    return False
+
+            # Create a new SampleTableModel instance with the email data
+            with db.get_session() as session:
+                db_commit = SampleTableModel(
+                    email_subject=subject,
+                    email_id=message_id,
+                    email_sender=sender,
+                    email_received_at=datetime.utcnow(),
+                    email_snippet=snippet,
+                )
+                
+                session.add(db_commit)
+                # Session will be committed automatically by the context manager
+                
+            logger.info(f"✅ Email log saved to database: {subject}")
+            return True
+            
+        except Exception as e:
+            # Check if it's a unique constraint error
+            logger.error(f"❌ Error saving email log to database: {e}")
+            return False
         
         # For now, just log that we processed the email
         logger.info(f"✓ Successfully processed email {message_id}")
@@ -118,53 +155,3 @@ def process_email(message: Dict[str, Any]) -> None:
         # Don't re-raise the exception to avoid breaking the main flow
         # The error is logged and the processing continues
 
-
-
-
-# Test data for development and testing
-DUMMY_EMAIL_PAYLOAD = {
-    "id": "test_message_123456789",
-    "threadId": "test_thread_987654321",
-    "labelIds": ["INBOX", "UNREAD"],
-    "snippet": "This is a test email for development purposes. It contains sample content to test your email processing logic.",
-    "payload": {
-        "partId": "",
-        "mimeType": "multipart/alternative",
-        "filename": "",
-        "headers": [
-            {"name": "From", "value": "test.sender@example.com"},
-            {"name": "To", "value": "your.email@gmail.com"},
-            {"name": "Subject", "value": "Test Email - Development Sample"},
-            {"name": "Date", "value": "Mon, 15 Oct 2024 10:30:00 +0000"},
-            {"name": "Message-ID", "value": "<test123@example.com>"}
-        ],
-        "body": {"size": 0},
-        "parts": [
-            {
-                "partId": "0",
-                "mimeType": "text/plain",
-                "filename": "",
-                "headers": [{"name": "Content-Type", "value": "text/plain; charset=UTF-8"}],
-                "body": {
-                    "size": 156,
-                    # Base64 encoded: "Hello!\n\nThis is a test email for development purposes.\n\nYou can modify this dummy payload to match your specific use case.\n\nBest regards,\nTest System"
-                    "data": "SGVsbG8hCgpUaGlzIGlzIGEgdGVzdCBlbWFpbCBmb3IgZGV2ZWxvcG1lbnQgcHVycG9zZXMuCgpZb3UgY2FuIG1vZGlmeSB0aGlzIGR1bW15IHBheWxvYWQgdG8gbWF0Y2ggeW91ciBzcGVjaWZpYyB1c2UgY2FzZS4KCkJlc3QgcmVnYXJkcywKVGVzdCBTeXN0ZW0="
-                }
-            },
-            {
-                "partId": "1", 
-                "mimeType": "text/html",
-                "filename": "",
-                "headers": [{"name": "Content-Type", "value": "text/html; charset=UTF-8"}],
-                "body": {
-                    "size": 234,
-                    # Base64 encoded: "<html><body><p>Hello!</p><p>This is a <strong>test email</strong> for development purposes.</p><p>You can modify this dummy payload to match your specific use case.</p><p>Best regards,<br>Test System</p></body></html>"
-                    "data": "PGh0bWw+PGJvZHk+PHA+SGVsbG8hPC9wPjxwPlRoaXMgaXMgYSA8c3Ryb25nPnRlc3QgZW1haWw8L3N0cm9uZz4gZm9yIGRldmVsb3BtZW50IHB1cnBvc2VzLjwvcD48cD5Zb3UgY2FuIG1vZGlmeSB0aGlzIGR1bW15IHBheWxvYWQgdG8gbWF0Y2ggeW91ciBzcGVjaWZpYyB1c2UgY2FzZS48L3A+PHA+QmVzdCByZWdhcmRzLDxicj5UZXN0IFN5c3RlbTwvcD48L2JvZHk+PC9odG1sPg=="
-                }
-            }
-        ]
-    },
-    "sizeEstimate": 1234,
-    "historyId": "987654321",
-    "internalDate": "1697365800000"
-}

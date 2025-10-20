@@ -10,7 +10,7 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build, Resource
 from googleapiclient.errors import HttpError
 from src.utils.logger import setup_logger
-from src.process_email import process_email
+from app.process_email import process_email
 from src.config import config
 
 logger = setup_logger(__name__)
@@ -270,45 +270,3 @@ class GmailHandler:
             
         except Exception as e:
             logger.error(f"Error processing message {message.get('id', 'unknown')}: {e}")
-    
-    def extract_message_text(self, message: Dict[str, Any]) -> str:
-        """
-        Extract text content from a Gmail message.
-        
-        Args:
-            message: Gmail message data
-            
-        Returns:
-            Extracted text content
-        """
-        def extract_text_from_part(part: Dict[str, Any]) -> str:
-            """Recursively extract text from message parts."""
-            text = ""
-            
-            if part.get('mimeType') == 'text/plain':
-                data = part.get('body', {}).get('data', '')
-                if data:
-                    text += base64.urlsafe_b64decode(data).decode('utf-8', errors='ignore')
-            
-            elif part.get('mimeType') == 'text/html':
-                # For HTML, you might want to strip tags or convert to plain text
-                data = part.get('body', {}).get('data', '')
-                if data:
-                    html_content = base64.urlsafe_b64decode(data).decode('utf-8', errors='ignore')
-                    # Simple HTML tag removal (you might want to use a proper HTML parser)
-                    import re
-                    text += re.sub(r'<[^>]+>', '', html_content)
-            
-            # Handle multipart messages
-            if 'parts' in part:
-                for subpart in part['parts']:
-                    text += extract_text_from_part(subpart)
-            
-            return text
-        
-        try:
-            payload = message.get('payload', {})
-            return extract_text_from_part(payload).strip()
-        except Exception as e:
-            logger.error(f"Error extracting text from message: {e}")
-            return ""

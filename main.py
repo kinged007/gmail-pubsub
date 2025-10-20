@@ -18,7 +18,9 @@ from google.cloud import secretmanager
 from src.gmail_handler import GmailHandler
 from src.watch_manager import WatchManager
 from src.utils.logger import setup_logger
+from src.database import init_database, close_database, get_database
 from dotenv import load_dotenv
+from src.config import env_var_map
 
 # Load environment variables from .env file if it exists
 load_dotenv()
@@ -33,8 +35,26 @@ logger.info(f"PORT environment variable: {os.environ.get('PORT', 'NOT_SET')}")
 logger.info(f"GOOGLE_CLOUD_PROJECT: {os.environ.get('GOOGLE_CLOUD_PROJECT', 'NOT_SET')}")
 
 # Initialize FastAPI app
-app = FastAPI(title="Gmail Push Processing API", version="1.0.0")
+fapp = FastAPI(title="Gmail Push Processing API", version="1.0.0")
 logger.info("✅ FastAPI app initialized")
+
+# Initialize database during startup
+@fapp.on_event("startup")
+async def startup_event():
+    """Initialize database connection during application startup."""
+    logger.info("🔄 Initializing database connection...")
+    db_initialized = init_database()
+    if db_initialized:
+        logger.info("✅ Database initialized successfully")
+    else:
+        logger.info("ℹ️ Database initialization skipped (not configured or disabled)")
+
+@fapp.on_event("shutdown")
+async def shutdown_event():
+    """Clean up database connection during application shutdown."""
+    logger.info("🔄 Shutting down database connection...")
+    close_database()
+    logger.info("✅ Database connection closed")
 
 # Global variables for handlers
 gmail_handler = None
@@ -83,23 +103,16 @@ def get_environment_info():
     }
 
     # Get environment variables that are commonly used in this project
-    important_env_vars = [
-        'GOOGLE_CLOUD_PROJECT',
-        'GOOGLE_CLOUD_REGION',
-        'GOOGLE_SERVICE_ACCOUNT_JSON',
-        'CLOUD_RUN_SERVICE_NAME',
-        'PUBSUB_TOPIC_NAME',
-        'PUBSUB_SUBSCRIPTION_NAME',
-        'SERVICE_ACCOUNT_NAME',
-        'LOG_LEVEL',
-        'PORT'
-    ]
-
-    for var in important_env_vars:
+    for var in env_var_map.values():
         value = os.getenv(var)
         if value:
             # Show only first 6 characters of the value for security
-            masked_value = value[:6] + '...' if len(value) > 6 else value
+            if var in ['GMAIL_WATCH_LABELS']:
+                masked_value = value
+            elif var in ['API_ACCESS_TOKEN', 'DATABASE_URL']:
+                masked_value = '******'  # Mask sensitive values
+            else:
+                masked_value = value[:6] + '...' if len(value) > 6 else value
             env_info['env_variables'][var] = masked_value
 
     return env_info
@@ -166,23 +179,28 @@ def get_service_account_info():
     logger.info("Initialized Gmail handler and watch manager")
 
 
-@app.get('/health')
+@fapp.get('/health')
 def health():
     """Health check endpoint."""
     logger.info("🏥 Health check endpoint called")
 
     # Get environment information
     env_info = get_environment_info()
+    
+    # Get database health status
+    db = get_database()
+    db_health = db.health_check()
 
     return {
         'status': 'healthy',
         'service': 'gmail-push-api',
         'version': '1.0.0',
-        'environment': env_info
+        'environment': env_info,
+        'database': db_health
     }
 
 
-@app.get('/startup')
+@fapp.get('/startup')
 def startup_check():
     """Startup check endpoint to test service account initialization"""
     logger.info("🚀 Startup check endpoint called")
@@ -208,7 +226,7 @@ def startup_check():
         }
 
 
-@app.post('/email-notify')
+@fapp.post('/email-notify')
 async def email_notify(request: Request, background_tasks: BackgroundTasks):
     """
     Handle Pub/Sub push notifications for new emails.
@@ -345,7 +363,7 @@ async def email_notify(request: Request, background_tasks: BackgroundTasks):
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@app.post('/renew-watch')
+@fapp.post('/renew-watch')
 def renew_watch():
     """
     Renew Gmail watch subscription.
@@ -371,7 +389,7 @@ def renew_watch():
         raise HTTPException(status_code=500, detail={'error': 'Internal server error', 'details': str(e)})
 
 
-@app.get('/watch-status')
+@fapp.get('/watch-status')
 def watch_status():
     """
     Get current Gmail watch status and profile information.
@@ -394,7 +412,7 @@ def watch_status():
         raise HTTPException(status_code=500, detail={'error': 'Internal server error', 'details': str(e)})
 
 
-@app.post('/stop-watch')
+@fapp.post('/stop-watch')
 def stop_watch():
     """
     Stop Gmail watch subscription.
@@ -427,4 +445,4 @@ if __name__ == '__main__':
     # For local development
     import uvicorn
     port = int(os.environ.get('PORT', 8080))
-    uvicorn.run(app, host='0.0.0.0', port=port)
+    uvicorn.run(fapp, host='0.0.0.0', port=port)

@@ -145,5 +145,10 @@ service-account.json
 config.yaml
 .uv/
 
-# Developer customizable file (untracked after initial creation)
-app/process_email.py
+# Database files
+*.db
+*.sqlite3
+*.sqlite
+*.db-journal
+*.sqlite-shm
+*.sqlite-wal
