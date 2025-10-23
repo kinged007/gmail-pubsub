@@ -45,7 +45,7 @@ class DatabaseManager:
                          If None, checks DATABASE_URL environment variable.
                          If empty/None, database functionality is disabled.
         """
-        self.database_url = database_url or config.get('database.url', '').strip()
+        self.database_url = database_url or config.get('DATABASE_URL', '').strip()
         self.engine = None
         self.SessionLocal = None
         self.is_connected = False

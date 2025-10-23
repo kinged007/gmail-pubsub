@@ -158,13 +158,14 @@ class GmailHandler:
             except (ValueError, TypeError):
                 logger.warning(f"Could not compare history IDs as integers, processing anyway")
 
+            # Get the current history ID to compare
+            profile = service.users().getProfile(userId='me').execute()
+            current_history_id = profile.get('historyId')
+
             # Use the last processed ID as the starting point, or the incoming ID if no previous state
             start_history_id = last_processed_id if last_processed_id else history_id
 
-            # Use the incoming history ID as the end point (this is the latest state from Pub/Sub)
-            end_history_id = history_id
-
-            logger.info(f"Processing history from {start_history_id} to {end_history_id}")
+            logger.info(f"Processing history from {start_history_id} to {current_history_id}")
 
             # List history since the starting history ID
             history_response = service.users().history().list(
@@ -175,7 +176,8 @@ class GmailHandler:
 
             history_records = history_response.get('history', [])
             logger.info(f"Found {len(history_records)} history records to process")
-            print(history_records)
+            # print(history_records)
+            
             if not history_records:
                 logger.info("No new history records found")
                 # Still update the last processed ID to the incoming one
@@ -187,6 +189,14 @@ class GmailHandler:
                 messages_added = record.get('messagesAdded', [])
                 for message_added in messages_added:
                     message_id = message_added['message']['id']
+                    labelIds = message_added['message'].get('labelIds', [])
+                    # Filter for requested labels only
+                    watch_labels = config.get_gmail_watch_label_ids() or config.get_gmail_watch_labels()
+                    if watch_labels:
+                        if not any(label in labelIds for label in watch_labels):
+                            logger.info(f"Skipping message {message_id} due to label filter")
+                            continue
+                    
                     logger.info(f"Processing new message: {message_id}")
 
                     # Fetch and process the message
@@ -197,8 +207,8 @@ class GmailHandler:
 
             logger.info(f"Processed {messages_processed} new messages")
 
-            # Save the incoming history ID as the last processed
-            self.save_last_processed_history_id(str(history_id))
+            # Save the current history ID as the last processed
+            self.save_last_processed_history_id(str(current_history_id))
                         
         except HttpError as e:
             logger.error(f"Gmail API error processing history: {e}")
@@ -222,12 +232,8 @@ class GmailHandler:
                 id=message_id,
                 format='full'
             ).execute()
-            # logger.info("Returned Message ID: %s", message.get('id', 'N/A'))
-            if not message.get('id', None):
-                logger.info(f"Message {message_id} has no ID, skipping")
-                return None
-            # logger.info(message) # Debug log to see message structure
-            # logger.info(f"Fetched message {message_id}")
+            
+            logger.info(f"Fetched message {message_id}")
             return message
             
         except HttpError as e:
@@ -254,15 +260,8 @@ class GmailHandler:
             subject = next((h['value'] for h in headers if h['name'].lower() == 'subject'), 'No Subject')
             sender = next((h['value'] for h in headers if h['name'].lower() == 'from'), 'Unknown Sender')
             
-            # Apply label filtering if configured
-            labelIds = message.get('labelIds', [])
-            requestedLabels = config.get_gmail_watch_label_ids()
-            if requestedLabels and not any(label in labelIds for label in requestedLabels):
-                logger.info(f"Message {message_id} skipped due to label filter")
-                return
-
-            logger.info(f"Processing message {message_id}: '{subject}' from {sender} with labels {labelIds}")
-
+            logger.info(f"Processing message {message_id}: '{subject}' from {sender}")
+            
             # Call the custom processing function
             process_email(message)
             
@@ -270,3 +269,45 @@ class GmailHandler:
             
         except Exception as e:
             logger.error(f"Error processing message {message.get('id', 'unknown')}: {e}")
+    
+    def extract_message_text(self, message: Dict[str, Any]) -> str:
+        """
+        Extract text content from a Gmail message.
+        
+        Args:
+            message: Gmail message data
+            
+        Returns:
+            Extracted text content
+        """
+        def extract_text_from_part(part: Dict[str, Any]) -> str:
+            """Recursively extract text from message parts."""
+            text = ""
+            
+            if part.get('mimeType') == 'text/plain':
+                data = part.get('body', {}).get('data', '')
+                if data:
+                    text += base64.urlsafe_b64decode(data).decode('utf-8', errors='ignore')
+            
+            elif part.get('mimeType') == 'text/html':
+                # For HTML, you might want to strip tags or convert to plain text
+                data = part.get('body', {}).get('data', '')
+                if data:
+                    html_content = base64.urlsafe_b64decode(data).decode('utf-8', errors='ignore')
+                    # Simple HTML tag removal (you might want to use a proper HTML parser)
+                    import re
+                    text += re.sub(r'<[^>]+>', '', html_content)
+            
+            # Handle multipart messages
+            if 'parts' in part:
+                for subpart in part['parts']:
+                    text += extract_text_from_part(subpart)
+            
+            return text
+        
+        try:
+            payload = message.get('payload', {})
+            return extract_text_from_part(payload).strip()
+        except Exception as e:
+            logger.error(f"Error extracting text from message: {e}")
+            return ""

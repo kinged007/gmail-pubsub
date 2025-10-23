@@ -109,7 +109,7 @@ def get_environment_info():
             # Show only first 6 characters of the value for security
             if var in ['GMAIL_WATCH_LABELS']:
                 masked_value = value
-            elif var in ['API_ACCESS_TOKEN', 'DATABASE_URL']:
+            elif var in ['API_ACCESS_TOKEN']:
                 masked_value = '******'  # Mask sensitive values
             else:
                 masked_value = value[:6] + '...' if len(value) > 6 else value
@@ -253,7 +253,7 @@ async def email_notify(request: Request, background_tasks: BackgroundTasks):
             logger.warning("No JSON payload received")
             raise HTTPException(status_code=400, detail="No JSON payload")
 
-        logger.info(f"Received Pub/Sub envelope: {envelope}")
+        logger.debug(f"Received Pub/Sub envelope: {envelope}")
         pubsub_message = envelope.get('message')
         if not pubsub_message:
             logger.warning("No message in payload")
@@ -276,7 +276,7 @@ async def email_notify(request: Request, background_tasks: BackgroundTasks):
             # Try to parse as JSON (Gmail push notifications may send JSON)
             try:
                 notification_data = json.loads(decoded_data)
-                logger.info(f"Parsed notification data.")
+                logger.debug(f"Parsed notification data.")
 
                 # Check if this is a Gmail history notification
                 if 'historyId' in notification_data:
@@ -287,7 +287,7 @@ async def email_notify(request: Request, background_tasks: BackgroundTasks):
                         # This is a watch notification with both emailAddress and historyId
                         # This typically means the watch is active and reporting current state
                         logger.info(f"Received Gmail watch notification for {email_address} with history ID: {history_id}")
-                        logger.info("📤 Queuing Gmail history processing in background task")
+                        logger.debug("📤 Queuing Gmail history processing in background task")
 
                         # Queue background processing - don't block the client
                         background_tasks.add_task(
@@ -307,7 +307,7 @@ async def email_notify(request: Request, background_tasks: BackgroundTasks):
                     else:
                         # Traditional Gmail history notification (just historyId)
                         logger.info(f"Received Gmail history notification with history ID: {history_id}")
-                        logger.info("📤 Queuing Gmail history processing in background task")
+                        logger.debug("📤 Queuing Gmail history processing in background task")
 
                         # Queue background processing - don't block the client
                         background_tasks.add_task(
@@ -337,12 +337,10 @@ async def email_notify(request: Request, background_tasks: BackgroundTasks):
 
             except json.JSONDecodeError:
                 # Not JSON - this might be the actual Gmail message content
-                logger.info(f"Message data is not JSON, length: {len(decoded_data)} characters")
+                logger.warning(f"Message data is not JSON, length: {len(decoded_data)} characters")
                 logger.info(f"First 200 characters: {decoded_data[:200]}")
 
                 # This could be the raw email content that Gmail is pushing
-                # For now, we'll acknowledge receipt and log it
-                logger.warning("Received raw message content from Gmail push notification")
 
                 # TODO: Implement processing of raw Gmail message content
                 # This would involve parsing the email format and extracting relevant information

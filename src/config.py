@@ -69,7 +69,7 @@ env_var_map = {
     "api.access_token": "API_ACCESS_TOKEN",
 
     # Database Configuration
-    "database.url": "DATABASE_URL",
+    # "database.url": "DATABASE_URL",
 
     # Application Configuration
     # "app.log_level": "LOG_LEVEL",
@@ -154,6 +154,14 @@ class Config:
             self.save_config()
             return value
 
+        if not yaml_only:
+            # Attempt to get it from env. 
+            if env_var_name and os.getenv(env_var_name):
+                value = os.getenv(env_var_name)
+                # current[keys[-1]] = value
+                # self.save_config()
+                return value
+        
         # Value doesn't exist, prompt user
         if prompt:
             if cmd and self.run_command:

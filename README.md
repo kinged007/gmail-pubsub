@@ -1,6 +1,8 @@
 # Gmail Pub/Sub Processing API
 
-A fully-autonomous Cloud Run API that receives Gmail push notifications, processes new messages through custom Python logic, and automatically renews Gmail watch subscriptions.
+A fully-autonomous Cloud Run API that receives Gmail push notifications, processes new email messages through custom Python logic, and automatically renews Gmail watch subscriptions.
+
+This tool is designed to set up the automation easily, while leaving plenty of room for customization and integration with other systems.
 
 ## 🏗️ Architecture
 
@@ -22,7 +24,7 @@ A fully-autonomous Cloud Run API that receives Gmail push notifications, process
 
 1. **Clone and setup the project:**
    ```bash
-   git clone <your-repo>
+   git clone https://github.com/kinged007/gmail-pubsub.git
    cd gmail-pubsub
    uv sync
    ```
@@ -98,15 +100,19 @@ The project uses a `config.yaml` file to store configuration. This file is autom
 
 ### Environment Variables
 
-You can optionally create a `.env` file for additional environment variables:
+`.env` file is auto generated from the example or modified for additional environment variables:
 
 ```env
 # Optional environment variables
 LOG_LEVEL=INFO
 CUSTOM_SETTING=value
+DATABASE_URL=
+GMAIL_WATCH_LABELS=INBOX
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHAT_ID=
 ```
 
-The `.env` file will be automatically included in the Cloud Run deployment if it exists.
+The `.env` file will be automatically be imported into Cloud Run environment, if it exists.
 
 ## 🛠️ Available Scripts
 
@@ -116,6 +122,7 @@ The `.env` file will be automatically included in the Cloud Run deployment if it
 | `uv run deploy` | Deploy application to Cloud Run (Steps 6-7) |
 | `uv run test` | Test your email processing logic with dummy data |
 | `uv run reset` | Reset project configuration and optionally destroy all resources |
+| `uv run cleanup` | Script to cleanup unused Google Cloud resources such as revisions, images, etc. that are created from this project. |
 
 ## 📡 API Endpoints
 
@@ -174,10 +181,11 @@ This will:
 The main email processing logic is in `app/process_email.py`. This file contains:
 
 - `process_email(message)`: Main function called for each new email
-- Uses utility functions from `app/utils/email_utils.py` for parsing Gmail messages
+- Uses utility functions from `src/utils/email_utils.py` for parsing Gmail messages
+- Includes local utils for custom utilities at `app/utils.py`. 
 - Clean, focused implementation for your custom business logic
 
-The `app/utils/email_utils.py` module provides:
+The `src/utils/email_utils.py` module provides:
 - `get_headers()`: Extract email headers
 - `extract_message_body()`: Extract text content from email body
 - `extract_attachments()`: Extract attachment information
@@ -300,10 +308,10 @@ curl https://your-service-url/watch-status
 ### View Logs
 ```bash
 # View Cloud Run logs
-gcloud logs read --service=gmail-push-api --limit=50
+gcloud app logs read --service=gmail-push-api --limit=50
 
 # Follow logs in real-time
-gcloud logs tail --service=gmail-push-api
+gcloud app logs tail --service=gmail-push-api
 ```
 
 ### Test Email Processing
@@ -313,19 +321,12 @@ Send a test email to your Gmail account and check the logs to see if it's proces
 
 ### Local Development
 
-1. **Set up service account:**
-   ```bash
-   # Download service account key
-   gcloud iam service-accounts keys create service-account.json \
-     --iam-account=gmail-processor@your-project.iam.gserviceaccount.com
-   ```
-
-2. **Run locally:**
+1. **Run locally:**
    ```bash
    uv run python main.py
    ```
 
-3. **Test endpoints:**
+2. **Test endpoints:**
    ```bash
    curl http://localhost:8080/health
    ```
@@ -342,10 +343,10 @@ uv add --dev package-name
 
 ## 📝 Customization Notes
 
-- The `app/process_email.py` file is added to `.gitignore` after initial creation
-- This allows you to customize it without committing sensitive business logic
 - The file contains comprehensive examples and helper functions
 - All email processing errors are caught and logged to prevent service disruption
+- Email messages that arrive to your custom `process_email` method are already filtered out for selected Gmail Label Id's.
+
 
 ## 🚨 Important Security Notes
 

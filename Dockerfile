@@ -33,4 +33,4 @@ EXPOSE 8080
 # Use --workers 1 for Cloud Run (single instance)
 # --access-log for request logging
 # --timeout-keep-alive for longer connections
-CMD exec uvicorn main:fapp --host 0.0.0.0 --port $PORT --workers 1 --access-log --timeout-keep-alive 30
+CMD exec uvicorn main:fapp --host 0.0.0.0 --port $PORT --workers 3 --access-log --timeout-keep-alive 30
