@@ -42,8 +42,7 @@ No `npm run check` / `go vet` in this repo; CI runs pytest + ruff + mypy.
 
 ## Permissions and scope
 
-- Read `docs/03-tenantflex.md` in the profile-cleanup workspace for context on TenantFlex: do not publish private TenantFlex code. This repo is standalone — keep it that way.
-- Do not add network calls in tests; mock Gmail/Secret Manager.
+- This repo is self-contained. Do not add network calls in tests; mock external services (Gmail, Secret Manager).
 
 ## Skills
 
