@@ -8,9 +8,6 @@ Autonomous Gmail → Pub/Sub → Cloud Run pipeline. A FastAPI service receives 
 
 Built for Cloud Run + Pub/Sub with background-task ACKs, BeautifulSoup body parsing, and an optional SQLAlchemy persistence layer.
 
-![Demo](./docs/screenshot.png)
-> Screenshot to be added — architecture diagram is at [`docs/architecture.md`](./docs/architecture.md).
-
 ## Architecture
 
 ```
