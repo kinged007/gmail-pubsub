@@ -3,7 +3,7 @@ name = "gmail-pubsub"
 version = "0.1.0"
 description = "Gmail Push Processing API with Cloud Run and Pub/Sub"
 authors = [
-    {name = "Developer", email = "developer@example.com"}
+    {name = "kinged007", email = "599286+kinged007@users.noreply.github.com"}
 ]
 readme = "README.md"
 requires-python = ">=3.11"
@@ -75,3 +75,24 @@ deploy = "scripts.deploy:main"
 test = "scripts.test:main"
 reset = "scripts.reset:main"
 cleanup = "scripts.cleanup:main"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+ignore = []
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-q"
+
+[tool.coverage.run]
+source = ["src", "app"]
+branch = true
+
+[tool.coverage.report]
+skip_covered = false
+show_missing = true
